@@ -1,0 +1,43 @@
+# .dotfiles-sync.yml — workbench-ssh
+#
+# Ecosystem module (workbench-core ARCHITECTURE.md §2/§3): opinionated SSH
+# client layer — hardened defaults, agent routing scaffold, multi-forge
+# known-hosts pre-trust. Meaningless standalone — depends on
+# workbench-core's loader and Core API. The bootstrap-critical deploy-key/
+# alias mechanics (10-workbench.conf) stay in workbench-core itself
+# (lib/ssh/bootstrap.sh, ARCHITECTURE.md D1) — not part of this module.
+#
+# See contracts/manifest-spec.md (in workbench-core) for the full field
+# reference.
+version: 1
+branch: main
+
+core_api: ">=1.1 <2.0"
+sync:
+  enabled: true
+
+# No deploy: entries — ~/.ssh/ is on the dest denylist (contracts/
+# manifest-spec.md's "dest validation" section), for good reason: SSH config
+# is security-sensitive and not something a manifest should be able to
+# target declaratively. files/00-defaults.conf and files/01-agent.conf ship
+# in this repo (read by hooks/post-deploy.sh from its own module snapshot,
+# $WORKBENCH_MODULE_DIR) but are placed into ~/.ssh/config.d/ by the hook
+# script below instead — the same escape valve workbench-core's own
+# lib/ssh/bootstrap.sh uses for the bootstrap-critical case (D1).
+
+register:
+  shell:
+    - src: shell/ssh.sh
+      tier: tools
+  getters:
+    - name: ssh
+      function: get-ssh-functions
+      label: "SSH agent and host-listing helpers"
+
+hooks:
+  post_deploy:
+    command: ["hooks/post-deploy.sh"]
+    run_on: changed   # fires on first sync and whenever this module updates —
+                       # not "always" (avoid an ssh-keyscan network round trip
+                       # on every automatic timer tick when nothing changed).
+    timeout: 60
