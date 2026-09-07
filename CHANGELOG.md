@@ -24,3 +24,10 @@ All notable changes to `workbench-ssh` are documented here.
   `lib/ssh/bootstrap.sh` alias convention (`workbench-<module-name>`).
 - Config.d load-order table updated: `10-dotfiles.conf` → `10-workbench.conf`
   (owned by `workbench-core`, not this module).
+- `ControlMaster`/`ControlPath`/`ControlPersist` in `00-defaults.conf` are
+  now actually enabled (were left commented out in the precursor's own
+  template) — the README, `hooks/post-deploy.sh`'s `~/.ssh/cm_sockets`
+  creation, and the `Host workbench-*` no-multiplexing carve-out all
+  assumed multiplexing was active, so leaving it disabled by default was
+  an inconsistency, not an intentional opt-in.
+

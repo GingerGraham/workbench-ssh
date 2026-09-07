@@ -11,7 +11,7 @@ list-ssh-hosts() {
 
     if [[ -f "${main_config}" ]]; then
         echo "=== Main Config ==="
-        grep -E "^Host\s" "${main_config}" | sed 's/Host //'
+        grep -E "^Host[[:space:]]" "${main_config}" | sed 's/Host //'
         echo
     fi
 
@@ -19,7 +19,7 @@ list-ssh-hosts() {
         for config_file in "${config_dir}"/*; do
             [[ -f "${config_file}" ]] || continue
             echo "=== $(basename "${config_file}") ==="
-            grep -E "^Host\s" "${config_file}" | sed 's/Host //'
+            grep -E "^Host[[:space:]]" "${config_file}" | sed 's/Host //'
             echo
         done
     fi

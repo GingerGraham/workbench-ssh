@@ -38,7 +38,7 @@ while IFS= read -r src; do
     else
         fail "manifest references missing file: ${src}"
     fi
-done < <(grep -E '^\s*(-\s*)?src:' "${MANIFEST}" | sed -E 's/^\s*-?\s*src:\s*//')
+done < <(grep -E '^[[:space:]]*(-[[:space:]]*)?src:' "${MANIFEST}" | sed -E 's/^[[:space:]]*-?[[:space:]]*src:[[:space:]]*//')
 
 for f in files/00-defaults.conf files/01-agent.conf; do
     [[ -f "${REPO_ROOT}/${f}" ]] && ok "hook-consumed file exists: ${f}" || fail "hook-consumed file missing: ${f}"
