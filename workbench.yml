@@ -1,4 +1,4 @@
-# .dotfiles-sync.yml — workbench-ssh
+# workbench.yml — workbench-ssh
 #
 # Ecosystem module (workbench-core ARCHITECTURE.md §2/§3): opinionated SSH
 # client layer — hardened defaults, agent routing scaffold, multi-forge
@@ -9,12 +9,15 @@
 #
 # See contracts/manifest-spec.md (in workbench-core) for the full field
 # reference.
-version: 1
+version: 2
 branch: main
 
 core_api: ">=1.1 <2.0"
 sync:
   enabled: true
+
+info:
+  description: "Hardened SSH client config, agent routing, and multi-forge known-hosts pre-trust"
 
 # No deploy: entries — ~/.ssh/ is on the dest denylist (contracts/
 # manifest-spec.md's "dest validation" section), for good reason: SSH config
