@@ -31,8 +31,9 @@ wb install --bundle workstation
    vendor's published fingerprints and remove it with `ssh-keygen -R <host>`
    if it is stale. A forge key rotation arrives as a module release.
 4. **Deploys `config.d/00-defaults.conf`** — hardened client settings that
-   apply to all connections: keepalive, modern key algorithm preferences
-   (including FIDO2 `sk-` keys), and safe defaults for `ForwardAgent`/`ForwardX11`.
+   apply to all connections: keepalive, ControlMaster multiplexing for the
+   Git forges only, modern key algorithm preferences (including FIDO2 `sk-`
+   keys), and safe defaults for `ForwardAgent`/`ForwardX11`.
 5. **Deploys an empty `config.d/01-agent.conf` scaffold** (created once,
    never overwritten) for local `IdentityAgent` routing.
 
@@ -97,6 +98,30 @@ agent socket paths.
 update. To add per-host overrides, create `~/.ssh/config.d/20-personal.conf`
 (or any `2x-` name) on the machine directly — it is never touched by this
 module.
+
+## Connection multiplexing
+
+`00-defaults.conf` enables `ControlMaster auto` / `ControlPersist 10m` only for
+github.com, gitlab.com and bitbucket.org, where fast repeated git operations
+benefit most. It is deliberately not enabled for every host: while a master
+connection is open, any process running as your user can open new sessions
+over its socket without re-authenticating, which bypasses FIDO2 touch,
+`ssh-add -c` confirmation and bastion MFA. The trade-off for opting a host in
+is faster repeated connections versus that ten-minute window.
+
+To opt a host in, add a block to a later file such as
+`~/.ssh/config.d/20-personal.conf`:
+
+```
+Host myhost
+    ControlMaster auto
+    ControlPath ~/.ssh/cm_sockets/%C
+    ControlPersist 10m
+```
+
+Because `00-defaults.conf` loads first and ssh uses the first value it finds,
+its `Host *` settings cannot be overridden per host by later files, so this
+module keeps `Host *` to defaults that are safe everywhere.
 
 ## Shell functions
 

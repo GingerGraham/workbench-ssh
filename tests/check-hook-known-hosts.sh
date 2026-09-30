@@ -103,6 +103,22 @@ else
     ok "ssh not installed -- ssh -G check skipped"
 fi
 
+# 8, 9 -- multiplexing is scoped to the forges (security review M8).
+if command -v ssh >/dev/null 2>&1; then
+    g="$(ssh -G example.com -F "${HOME}/test_config" 2>/dev/null | grep -i '^controlmaster ')"
+    case "${g}" in
+        "controlmaster false") ok "ssh -G example.com: controlmaster false" ;;
+        *) fail "ssh -G example.com controlmaster: ${g}" ;;
+    esac
+    g="$(ssh -G github.com -F "${HOME}/test_config" 2>/dev/null | grep -i '^controlmaster ')"
+    case "${g}" in
+        "controlmaster auto") ok "ssh -G github.com: controlmaster auto" ;;
+        *) fail "ssh -G github.com controlmaster: ${g}" ;;
+    esac
+else
+    ok "ssh not installed -- controlmaster checks skipped"
+fi
+
 echo
 if [[ ${FAILED} -eq 0 ]]; then
     echo "All ${check_no} checks passed."
