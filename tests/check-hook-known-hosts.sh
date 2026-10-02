@@ -18,13 +18,7 @@ if ! command -v ssh-keygen >/dev/null 2>&1; then
     exit 0
 fi
 
-# PENDING: files/known_hosts.forges is withheld until the forge fingerprints
-# are confirmed. Checks that need it report PENDING (not FAIL) while it is
-# absent; delete this fallback once the file is committed.
 PINNED="${REPO_ROOT}/files/known_hosts.forges"
-have_pinned=1
-[[ -f "${PINNED}" ]] || have_pinned=0
-pending() { check_no=$((check_no + 1)); echo "PENDING: [$check_no] $* (files/known_hosts.forges not committed yet)"; }
 
 TMP_HOME="$(mktemp -d)"
 trap 'rm -rf "${TMP_HOME}"' EXIT
@@ -63,25 +57,17 @@ else
 fi
 
 # 4
-if [[ ${have_pinned} -eq 1 ]]; then
-    if cmp -s "${HOME}/.ssh/known_hosts.d/workbench-forges" "${PINNED}"; then
-        ok "known_hosts.d/workbench-forges equals files/known_hosts.forges"
-    else
-        fail "known_hosts.d/workbench-forges differs from files/known_hosts.forges"
-    fi
+if cmp -s "${HOME}/.ssh/known_hosts.d/workbench-forges" "${PINNED}"; then
+    ok "known_hosts.d/workbench-forges equals files/known_hosts.forges"
 else
-    pending "known_hosts.d/workbench-forges equals files/known_hosts.forges"
+    fail "known_hosts.d/workbench-forges differs from files/known_hosts.forges"
 fi
 
 # 5
-if [[ ${have_pinned} -eq 1 ]]; then
-    case "${out}" in
-        *"[WARN]"*"github.com"*"not in the pinned set"*) ok "audit [WARN] line printed for github.com" ;;
-        *) fail "no audit [WARN] for github.com in output: ${out}" ;;
-    esac
-else
-    pending "audit [WARN] line printed for github.com"
-fi
+case "${out}" in
+    *"[WARN]"*"github.com"*"not in the pinned set"*) ok "audit [WARN] line printed for github.com" ;;
+    *) fail "no audit [WARN] for github.com in output: ${out}" ;;
+esac
 
 # 6
 if grep -q '^ *UserKnownHostsFile .*known_hosts\.d/workbench-forges' "${HOME}/.ssh/config.d/00-defaults.conf"; then
