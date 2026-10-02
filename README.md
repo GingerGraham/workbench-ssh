@@ -20,8 +20,11 @@ wb install --bundle workstation
    (`Include ~/.ssh/config.d/*.conf`) — idempotent.
 3. **Installs pinned host keys** for Git forges (GitHub, GitLab, Bitbucket)
    to `~/.ssh/known_hosts.d/workbench-forges`, copied from
-   `files/known_hosts.forges`, which ships in this repo and is verified
-   against each vendor's published fingerprints. `00-defaults.conf` lists it
+   `files/known_hosts.forges`, which ships in this repo. GitHub and GitLab
+   keys are taken from each vendor's docs and match their published
+   fingerprints; Bitbucket's come from `bitbucket.org/site/ssh` and were
+   checked by the maintainer against Atlassian's published fingerprints
+   (provenance is in the file's header). `00-defaults.conf` lists it
    as a second `UserKnownHostsFile`; your own `~/.ssh/known_hosts` is never
    written. Nothing is fetched from the network (no `ssh-keyscan`, which
    authenticates nothing). If your `~/.ssh/known_hosts` already holds a key
