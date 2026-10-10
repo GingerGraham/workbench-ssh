@@ -39,7 +39,7 @@ wb install --bundle workstation
    Git forges only, modern key algorithm preferences (including FIDO2 `sk-`
    keys), and safe defaults for `ForwardAgent`/`ForwardX11`. It is included at
    the *end* of `~/.ssh/config` under `Match all`, so it only fills in what
-   you have not set (see "Ordering" below). Versions before 0.3.0 installed
+   you have not set (see "Ordering" below). Releases before the one containing this change installed
    it as `config.d/00-defaults.conf`; the hook removes that file.
 5. **Deploys an empty `config.d/01-agent.conf` scaffold** (created once,
    never overwritten) for local `IdentityAgent` routing.
@@ -139,7 +139,7 @@ Include ~/.ssh/workbench-defaults.conf   # last: fills in whatever is still unse
 ```
 
 A per-host `ForwardAgent yes`, `ServerAliveInterval`, `ControlMaster` and so
-on in any of your files now takes effect; before 0.3.0 the module's `Host *`
+on in any of your files now takes effect; in earlier releases the module's `Host *`
 block silently overrode them. Keep the `Match all` / `Include` pair at the
 end of `~/.ssh/config`; the hook adds it if it is missing.
 
