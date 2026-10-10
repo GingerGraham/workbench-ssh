@@ -70,39 +70,91 @@ case "${out}" in
 esac
 
 # 6
-if grep -q '^ *UserKnownHostsFile .*known_hosts\.d/workbench-forges' "${HOME}/.ssh/config.d/00-defaults.conf"; then
-    ok "installed 00-defaults.conf contains the UserKnownHostsFile line"
+if grep -q '^ *UserKnownHostsFile .*known_hosts\.d/workbench-forges' "${HOME}/.ssh/workbench-defaults.conf"; then
+    ok "installed workbench-defaults.conf contains the UserKnownHostsFile line"
 else
-    fail "00-defaults.conf lacks the UserKnownHostsFile line"
+    fail "workbench-defaults.conf lacks the UserKnownHostsFile line"
 fi
 
-# 7 -- ssh expands ~ from the passwd entry, not $HOME, so include the
-# installed file by absolute path.
+# 7 -- defaults are included last, under Match all, and not from config.d/
+if [[ ! -e "${HOME}/.ssh/config.d/00-defaults.conf" ]] \
+    && [[ "$(tail -n 2 "${HOME}/.ssh/config")" == "Match all
+Include ~/.ssh/workbench-defaults.conf" ]]; then
+    ok "defaults included at the end of ~/.ssh/config under Match all"
+else
+    fail "defaults Include is not the last thing in ~/.ssh/config"
+fi
+
+# 8 -- idempotent: a second run adds no second Include
+(cd "${REPO_ROOT}" && bash hooks/post-deploy.sh >/dev/null 2>&1)
+if [[ "$(grep -c 'workbench-defaults.conf' "${HOME}/.ssh/config")" -eq 1 ]]; then
+    ok "second hook run does not duplicate the defaults Include"
+else
+    fail "defaults Include duplicated after a second hook run"
+fi
+
+# 9 -- legacy managed config.d/00-defaults.conf is removed; a foreign one is not
+printf '# managed by workbench-ssh\n' > "${HOME}/.ssh/config.d/00-defaults.conf"
+(cd "${REPO_ROOT}" && bash hooks/post-deploy.sh >/dev/null 2>&1)
+if [[ ! -e "${HOME}/.ssh/config.d/00-defaults.conf" ]]; then
+    ok "legacy managed config.d/00-defaults.conf removed"
+else
+    fail "legacy config.d/00-defaults.conf still present"
+fi
+printf '# my own file\n' > "${HOME}/.ssh/config.d/00-defaults.conf"
+(cd "${REPO_ROOT}" && bash hooks/post-deploy.sh >/dev/null 2>&1)
+if [[ -e "${HOME}/.ssh/config.d/00-defaults.conf" ]]; then
+    ok "user-owned config.d/00-defaults.conf left alone"
+else
+    fail "user-owned config.d/00-defaults.conf was deleted"
+fi
+rm -f "${HOME}/.ssh/config.d/00-defaults.conf"
+
+# 10+ -- real ssh -G behaviour. ssh expands ~ from the passwd entry, not
+# $HOME, so rewrite the tilde paths in the generated config to absolute ones.
 if command -v ssh >/dev/null 2>&1; then
-    printf 'Include %s\n' "${HOME}/.ssh/config.d/00-defaults.conf" > "${HOME}/test_config"
-    g="$(ssh -G github.com -F "${HOME}/test_config" 2>/dev/null | grep -i '^userknownhostsfile ')"
+    cat > "${HOME}/.ssh/config.d/20-user.conf" <<'USER'
+Host override.example
+    ForwardAgent yes
+    ServerAliveInterval 5
+Host github.com
+    ControlMaster no
+Host optin.example
+    ControlMaster auto
+USER
+    printf 'Host star.example\n    ForwardAgent yes\n' > "${HOME}/.ssh/config.d/30-star.conf"
+    sed "s#~/.ssh/#${HOME}/.ssh/#g" "${HOME}/.ssh/config" > "${HOME}/test_config"
+    gval() { ssh -G "$1" -F "${HOME}/test_config" 2>/dev/null | grep -i "^$2 " | head -n 1; }
+
+    g="$(gval github.com userknownhostsfile)"
     case "${g}" in
         *known_hosts*known_hosts.d/workbench-forges*) ok "ssh -G lists both known-hosts files" ;;
         *) fail "ssh -G userknownhostsfile: ${g}" ;;
     esac
-else
-    ok "ssh not installed -- ssh -G check skipped"
-fi
 
-# 8, 9 -- multiplexing is scoped to the forges (security review M8).
-if command -v ssh >/dev/null 2>&1; then
-    g="$(ssh -G example.com -F "${HOME}/test_config" 2>/dev/null | grep -i '^controlmaster ')"
-    case "${g}" in
-        "controlmaster false") ok "ssh -G example.com: controlmaster false" ;;
-        *) fail "ssh -G example.com controlmaster: ${g}" ;;
-    esac
-    g="$(ssh -G github.com -F "${HOME}/test_config" 2>/dev/null | grep -i '^controlmaster ')"
-    case "${g}" in
-        "controlmaster auto") ok "ssh -G github.com: controlmaster auto" ;;
-        *) fail "ssh -G github.com controlmaster: ${g}" ;;
-    esac
+    # expect <description> <host> <keyword> <expected value>
+    expect() {
+        local got
+        got="$(gval "$2" "$3")"
+        if [[ "${got}" == "$3 $4" ]]; then ok "$1"; else fail "$1 (got: ${got})"; fi
+    }
+
+    # multiplexing is scoped to the forges (security review M8)
+    expect "ssh -G example.com: controlmaster false" example.com controlmaster false
+    expect "ssh -G gitlab.com: controlmaster auto" gitlab.com controlmaster auto
+
+    # user settings win over module defaults, wherever they live
+    expect "per-host ForwardAgent yes in config.d beats the module default" override.example forwardagent yes
+    expect "per-host ServerAliveInterval beats the module default" override.example serveraliveinterval 5
+    expect "user can opt a forge out of ControlMaster" github.com controlmaster false
+    expect "user can opt a host in to ControlMaster" optin.example controlmaster auto
+    expect "later config.d file beats the module default" star.example forwardagent yes
+
+    # defaults still apply where the user set nothing
+    expect "unset host still gets ForwardAgent no" other.example forwardagent no
+    expect "unset host still gets ServerAliveInterval 60" other.example serveraliveinterval 60
 else
-    ok "ssh not installed -- controlmaster checks skipped"
+    ok "ssh not installed -- ssh -G checks skipped"
 fi
 
 echo

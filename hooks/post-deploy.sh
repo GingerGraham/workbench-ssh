@@ -20,6 +20,8 @@ SSH_DIR="${HOME}/.ssh"
 CONFIG_D_DIR="${SSH_DIR}/config.d"
 CM_SOCKETS_DIR="${SSH_DIR}/cm_sockets"
 CONFIG_PATH="${SSH_DIR}/config"
+DEFAULTS_PATH="${SSH_DIR}/workbench-defaults.conf"
+LEGACY_DEFAULTS_PATH="${CONFIG_D_DIR}/00-defaults.conf"
 KNOWN_HOSTS_PATH="${SSH_DIR}/known_hosts"
 KNOWN_HOSTS_D="${SSH_DIR}/known_hosts.d"
 FORGES_KNOWN_HOSTS="${KNOWN_HOSTS_D}/workbench-forges"
@@ -40,10 +42,27 @@ if ! grep -qxF 'Include ~/.ssh/config.d/*.conf' "${CONFIG_PATH}" 2>/dev/null; th
 fi
 
 # ── 3. Hardened client defaults — re-copied every run (this file is fully
-#      workbench-ssh-managed; per-host overrides belong in a higher-numbered
-#      config.d file instead, never in this one). ─────────────────────────
-cp "files/00-defaults.conf" "${CONFIG_D_DIR}/00-defaults.conf"
-chmod 600 "${CONFIG_D_DIR}/00-defaults.conf"
+#      workbench-ssh-managed; per-host overrides belong in a config.d/2x-*
+#      file instead, never in this one). ssh takes the first value it finds
+#      per keyword, so the file lives OUTSIDE config.d/ and is included at the
+#      END of ~/.ssh/config under `Match all`: the module's defaults then only
+#      apply where the user has not set a value. ─────────────────────────────
+cp "files/00-defaults.conf" "${DEFAULTS_PATH}"
+chmod 600 "${DEFAULTS_PATH}"
+if ! grep -qxF 'Include ~/.ssh/workbench-defaults.conf' "${CONFIG_PATH}" 2>/dev/null; then
+    {
+        printf '\n# workbench-ssh defaults: keep last so your own settings above win.\n'
+        printf 'Match all\n'
+        printf 'Include ~/.ssh/workbench-defaults.conf\n'
+    } >> "${CONFIG_PATH}"
+    echo "[INFO] workbench-ssh: added defaults Include to the end of ${CONFIG_PATH}"
+fi
+# Earlier versions installed the defaults as config.d/00-defaults.conf, which
+# loads first and shadows later settings. Remove it if it is ours.
+if [[ -f "${LEGACY_DEFAULTS_PATH}" ]] && grep -q 'managed by workbench-ssh' "${LEGACY_DEFAULTS_PATH}"; then
+    rm -f "${LEGACY_DEFAULTS_PATH}"
+    echo "[INFO] workbench-ssh: removed legacy ${LEGACY_DEFAULTS_PATH} (now ${DEFAULTS_PATH})"
+fi
 
 # ── 4. Agent-routing scaffold — created once, never overwritten. ─────────
 if [[ ! -f "${CONFIG_D_DIR}/01-agent.conf" ]]; then
@@ -57,7 +76,7 @@ fi
 # network it pins the attacker's key. The forge keys ship with this module
 # (files/known_hosts.forges, verified against each vendor's published
 # fingerprints) and are installed to a module-owned file that
-# 00-defaults.conf lists as a second UserKnownHostsFile. The user's own
+# workbench-defaults.conf lists as a second UserKnownHostsFile. The user's own
 # ~/.ssh/known_hosts is never written by this hook.
 mkdir -p "${KNOWN_HOSTS_D}"
 chmod 700 "${KNOWN_HOSTS_D}"

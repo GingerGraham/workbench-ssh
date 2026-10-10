@@ -4,6 +4,21 @@ All notable changes to `workbench-ssh` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Module defaults no longer shadow your own SSH settings.** ssh uses the
+  first value it finds per keyword, and `config.d/00-defaults.conf` loaded
+  before everything else, so its `Host *` block (`ForwardAgent no`,
+  `ServerAliveInterval`, `LogLevel`, ...) silently overrode per-host values in
+  your later `config.d` files and `~/.ssh/config`. The defaults now install
+  to `~/.ssh/workbench-defaults.conf` and are included at the end of
+  `~/.ssh/config` under `Match all`, so they only fill in what you have not
+  set. Behaviour is unchanged for anyone who set nothing; a per-host override
+  that was previously ignored will now take effect. The hook removes the old
+  `config.d/00-defaults.conf` (only if it is the managed one) and adds the
+  trailing `Include` idempotently. `Match all` alone would not have fixed
+  this (it is equivalent to `Host *`); the include position is what matters.
+
 ## [0.2.1] - 2026-10-10
 
 ### Security
