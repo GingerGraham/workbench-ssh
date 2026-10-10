@@ -4,6 +4,18 @@ All notable changes to `workbench-ssh` are documented here.
 
 ## [Unreleased]
 
+### Security
+
+- **Forge host keys are now pinned, not keyscanned** (security review H2).
+  `hooks/post-deploy.sh` no longer runs `ssh-keyscan` or rewrites
+  `~/.ssh/known_hosts`. The GitHub, GitLab and Bitbucket keys ship as
+  `files/known_hosts.forges` and are installed to
+  `~/.ssh/known_hosts.d/workbench-forges`, which `00-defaults.conf` lists as
+  a second `UserKnownHostsFile` (with `UpdateHostKeys yes`). The hook now
+  reports, and never deletes, forge keys already in `~/.ssh/known_hosts`
+  that are not in the pinned set.
+- `PubkeyAcceptedAlgorithms` now includes the FIDO2 `sk-` key types.
+
 ## [0.2.0] - 2026-09-23
 
 ### Added

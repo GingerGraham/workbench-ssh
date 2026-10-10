@@ -1,8 +1,8 @@
 # workbench.yml — workbench-ssh
 #
 # Ecosystem module (workbench-core ARCHITECTURE.md §2/§3): opinionated SSH
-# client layer — hardened defaults, agent routing scaffold, multi-forge
-# known-hosts pre-trust. Meaningless standalone — depends on
+# client layer — hardened defaults, agent routing scaffold, pinned
+# forge host keys. Meaningless standalone — depends on
 # workbench-core's loader and Core API. The bootstrap-critical deploy-key/
 # alias mechanics (10-workbench.conf) stay in workbench-core itself
 # (lib/ssh/bootstrap.sh, ARCHITECTURE.md D1) — not part of this module.
@@ -17,7 +17,7 @@ sync:
   enabled: true
 
 info:
-  description: "Hardened SSH client config, agent routing, and multi-forge known-hosts pre-trust"
+  description: "Hardened SSH client config, agent routing, and pinned forge host keys"
 
 # No deploy: entries — ~/.ssh/ is on the dest denylist (contracts/
 # manifest-spec.md's "dest validation" section), for good reason: SSH config
@@ -41,6 +41,6 @@ hooks:
   post_deploy:
     command: ["hooks/post-deploy.sh"]
     run_on: changed   # fires on first sync and whenever this module updates —
-                       # not "always" (avoid an ssh-keyscan network round trip
-                       # on every automatic timer tick when nothing changed).
+                       # not "always" (nothing to redo on every automatic
+                       # timer tick when the module hasn't changed).
     timeout: 60

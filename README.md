@@ -18,12 +18,24 @@ wb install --bundle workstation
    `~/.ssh/cm_sockets` (0700).
 2. **Ensures the `Include` directive** is the first line of `~/.ssh/config`
    (`Include ~/.ssh/config.d/*.conf`) — idempotent.
-3. **Adds known host keys** for Git forges (GitHub, GitLab, Bitbucket) by
-   running `ssh-keyscan` on every sync where this module updated. This
-   means it automatically picks up rotated host keys without any manual step.
+3. **Installs pinned host keys** for Git forges (GitHub, GitLab, Bitbucket)
+   to `~/.ssh/known_hosts.d/workbench-forges`, copied from
+   `files/known_hosts.forges`, which ships in this repo. GitHub and GitLab
+   keys are taken from each vendor's docs and match their published
+   fingerprints; Bitbucket's come from `bitbucket.org/site/ssh` and were
+   checked by the maintainer against Atlassian's published fingerprints
+   (provenance is in the file's header). `00-defaults.conf` lists it
+   as a second `UserKnownHostsFile`; your own `~/.ssh/known_hosts` is never
+   written. Nothing is fetched from the network (no `ssh-keyscan`, which
+   authenticates nothing). If your `~/.ssh/known_hosts` already holds a key
+   for one of these forges that is not in the pinned set (earlier versions
+   of this module put scanned keys there), the hook prints a `[WARN]` with
+   its fingerprint — it never deletes anything; check it against the
+   vendor's published fingerprints and remove it with `ssh-keygen -R <host>`
+   if it is stale. A forge key rotation arrives as a module release.
 4. **Deploys `config.d/00-defaults.conf`** — hardened client settings that
-   apply to all connections: keepalive, ControlMaster multiplexing, modern
-   key algorithm preferences, and safe defaults for `ForwardAgent`/`ForwardX11`.
+   apply to all connections: keepalive, modern key algorithm preferences
+   (including FIDO2 `sk-` keys), and safe defaults for `ForwardAgent`/`ForwardX11`.
 5. **Deploys an empty `config.d/01-agent.conf` scaffold** (created once,
    never overwritten) for local `IdentityAgent` routing.
 
@@ -101,5 +113,5 @@ ssh-copy-bw [--all] <user@host|user host> [key_pattern]
 
 ## Requires
 
-`ssh-keyscan` (part of `openssh-client`, already a `workbench-core`
-required prerequisite).
+`ssh-keygen` (part of `openssh-client`, already a `workbench-core`
+required prerequisite) — used only for the audit warning.
