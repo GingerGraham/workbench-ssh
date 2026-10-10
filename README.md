@@ -16,16 +16,17 @@ wb install --bundle workstation
 
 1. **Creates directories** — `~/.ssh` (0700), `~/.ssh/config.d` (0700),
    `~/.ssh/cm_sockets` (0700).
-2. **Ensures the `Include` directive** is the first line of `~/.ssh/config`
-   (`Include ~/.ssh/config.d/*.conf`) — idempotent.
+2. **Ensures the `Include` directives** — `Include ~/.ssh/config.d/*.conf`
+   as the first line of `~/.ssh/config`, and the module defaults (below) as
+   the last thing in it — idempotent.
 3. **Installs pinned host keys** for Git forges (GitHub, GitLab, Bitbucket)
    to `~/.ssh/known_hosts.d/workbench-forges`, copied from
    `files/known_hosts.forges`, which ships in this repo. GitHub and GitLab
    keys are taken from each vendor's docs and match their published
    fingerprints; Bitbucket's come from `bitbucket.org/site/ssh` and were
    checked by the maintainer against Atlassian's published fingerprints
-   (provenance is in the file's header). `00-defaults.conf` lists it
-   as a second `UserKnownHostsFile`; your own `~/.ssh/known_hosts` is never
+   (provenance is in the file's header). `workbench-defaults.conf` lists
+   it as a second `UserKnownHostsFile`; your own `~/.ssh/known_hosts` is never
    written. Nothing is fetched from the network (no `ssh-keyscan`, which
    authenticates nothing). If your `~/.ssh/known_hosts` already holds a key
    for one of these forges that is not in the pinned set (earlier versions
@@ -33,10 +34,13 @@ wb install --bundle workstation
    its fingerprint — it never deletes anything; check it against the
    vendor's published fingerprints and remove it with `ssh-keygen -R <host>`
    if it is stale. A forge key rotation arrives as a module release.
-4. **Deploys `config.d/00-defaults.conf`** — hardened client settings that
+4. **Deploys `~/.ssh/workbench-defaults.conf`** — hardened client settings that
    apply to all connections: keepalive, ControlMaster multiplexing for the
    Git forges only, modern key algorithm preferences (including FIDO2 `sk-`
-   keys), and safe defaults for `ForwardAgent`/`ForwardX11`.
+   keys), and safe defaults for `ForwardAgent`/`ForwardX11`. It is included at
+   the *end* of `~/.ssh/config` under `Match all`, so it only fills in what
+   you have not set (see "Ordering" below). Versions before 0.3.0 installed
+   it as `config.d/00-defaults.conf`; the hook removes that file.
 5. **Deploys an empty `config.d/01-agent.conf` scaffold** (created once,
    never overwritten) for local `IdentityAgent` routing.
 
@@ -67,7 +71,6 @@ bootstrap-critical deploy-key case (ARCHITECTURE.md D1).
 
 | File | Owner | Purpose |
 |------|-------|---------|
-| `00-defaults.conf` | workbench-ssh (re-copied every hook run) | Global `Host *` hardened defaults |
 | `01-agent.conf` | workbench-ssh (created once) → you | Local `IdentityAgent` routing — see below |
 | `10-workbench.conf` | `workbench-core` (`lib/ssh/bootstrap.sh`) | Deploy-key host aliases (`workbench-<module>`) |
 | `20-*.conf` and beyond | You | Per-host or per-employer overrides |
@@ -79,7 +82,7 @@ overwritten thereafter. It ships empty (commented scaffold only): this
 module makes no assumption about which SSH agent is running on a given
 machine.
 
-It loads right after `00-defaults.conf` and before `10-workbench.conf`, so
+It loads first in `config.d/` and before `10-workbench.conf`, so
 agent routing is settled before any per-repo or per-host override is
 considered.
 
@@ -97,14 +100,14 @@ agent socket paths.
 
 ## Extending client defaults
 
-`00-defaults.conf` is fully managed by this module and re-copied on every
+`~/.ssh/workbench-defaults.conf` is fully managed by this module and re-copied on every
 update. To add per-host overrides, create `~/.ssh/config.d/20-personal.conf`
 (or any `2x-` name) on the machine directly — it is never touched by this
 module.
 
 ## Connection multiplexing
 
-`00-defaults.conf` enables `ControlMaster auto` / `ControlPersist 10m` only for
+`workbench-defaults.conf` enables `ControlMaster auto` / `ControlPersist 10m` only for
 github.com, gitlab.com and bitbucket.org, where fast repeated git operations
 benefit most. It is deliberately not enabled for every host: while a master
 connection is open, any process running as your user can open new sessions
@@ -122,9 +125,23 @@ Host myhost
     ControlPersist 10m
 ```
 
-Because `00-defaults.conf` loads first and ssh uses the first value it finds,
-its `Host *` settings cannot be overridden per host by later files, so this
-module keeps `Host *` to defaults that are safe everywhere.
+## Ordering: your settings win
+
+ssh uses the first value it finds for each keyword, so a defaults file that
+loads early shadows everything after it. This module therefore keeps its
+defaults out of `config.d/` and includes them last:
+
+```
+Include ~/.ssh/config.d/*.conf      # first line: yours, plus 01-agent / 10-workbench
+...                                 # the rest of your ~/.ssh/config
+Match all
+Include ~/.ssh/workbench-defaults.conf   # last: fills in whatever is still unset
+```
+
+A per-host `ForwardAgent yes`, `ServerAliveInterval`, `ControlMaster` and so
+on in any of your files now takes effect; before 0.3.0 the module's `Host *`
+block silently overrode them. Keep the `Match all` / `Include` pair at the
+end of `~/.ssh/config`; the hook adds it if it is missing.
 
 ## Shell functions
 
