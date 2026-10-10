@@ -4,6 +4,8 @@ All notable changes to `workbench-ssh` are documented here.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-10
+
 ### Security
 
 - **Connection multiplexing is scoped to the Git forges** (security review
