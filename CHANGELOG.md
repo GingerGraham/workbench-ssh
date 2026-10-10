@@ -4,6 +4,26 @@ All notable changes to `workbench-ssh` are documented here.
 
 ## [Unreleased]
 
+### Security
+
+- **Connection multiplexing is scoped to the Git forges** (security review
+  M8, L10). `ControlMaster`/`ControlPersist` moved out of `Host *` into a
+  `Host github.com gitlab.com bitbucket.org` block, so other hosts no longer
+  expose a ten-minute socket that bypasses FIDO2 touch, `ssh-add -c` and MFA.
+  Hosts can be opted back in from a later `config.d` file (see the README).
+  The `00-defaults.conf` header no longer wrongly claims per-host blocks
+  always win over `Host *`.
+
+- **Forge host keys are now pinned, not keyscanned** (security review H2).
+  `hooks/post-deploy.sh` no longer runs `ssh-keyscan` or rewrites
+  `~/.ssh/known_hosts`. The GitHub, GitLab and Bitbucket keys ship as
+  `files/known_hosts.forges` and are installed to
+  `~/.ssh/known_hosts.d/workbench-forges`, which `00-defaults.conf` lists as
+  a second `UserKnownHostsFile` (with `UpdateHostKeys yes`). The hook now
+  reports, and never deletes, forge keys already in `~/.ssh/known_hosts`
+  that are not in the pinned set.
+- `PubkeyAcceptedAlgorithms` now includes the FIDO2 `sk-` key types.
+
 ## [0.2.0] - 2026-09-23
 
 ### Added

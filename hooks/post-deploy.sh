@@ -10,8 +10,8 @@
 # Replaces workbench-precursor's Ansible ssh role (tasks/main.yml,
 # client-defaults.yml, known-hosts.yml): directory setup, the ~/.ssh/config
 # Include directive, hardened client defaults, agent-routing scaffold, and
-# multi-forge known_hosts pre-trust. This all happens via a hook rather than
-# manifest deploy: entries because ~/.ssh/ is on the deploy dest denylist
+# pinned forge host keys (no keyscan — security review H2). This all happens
+# via a hook rather than manifest deploy: entries because ~/.ssh/ is on the deploy dest denylist
 # (contracts/manifest-spec.md) — the same escape valve workbench-core's own
 # lib/ssh/bootstrap.sh uses for the bootstrap-critical deploy-key case (D1).
 set -uo pipefail
@@ -21,7 +21,8 @@ CONFIG_D_DIR="${SSH_DIR}/config.d"
 CM_SOCKETS_DIR="${SSH_DIR}/cm_sockets"
 CONFIG_PATH="${SSH_DIR}/config"
 KNOWN_HOSTS_PATH="${SSH_DIR}/known_hosts"
-KEYSCAN_TIMEOUT=10
+KNOWN_HOSTS_D="${SSH_DIR}/known_hosts.d"
+FORGES_KNOWN_HOSTS="${KNOWN_HOSTS_D}/workbench-forges"
 FORGES="github.com gitlab.com bitbucket.org"
 
 # ── 1. Directories ────────────────────────────────────────────────────────
@@ -51,35 +52,35 @@ if [[ ! -f "${CONFIG_D_DIR}/01-agent.conf" ]]; then
     echo "[INFO] workbench-ssh: created ${CONFIG_D_DIR}/01-agent.conf (edit to route SSH agents per host)"
 fi
 
-# ── 5. Known hosts for Git forges ─────────────────────────────────────────
-# Best-effort, non-fatal per forge — a network blip or corporate egress
-# block on one forge must not abort the others, matching the donor
-# Ansible role's ignore_errors: true.
-touch "${KNOWN_HOSTS_PATH}"
-chmod 600 "${KNOWN_HOSTS_PATH}"
-_failed=""
-for forge in ${FORGES}; do
-    scan_out="$(ssh-keyscan -T "${KEYSCAN_TIMEOUT}" "${forge}" 2>/dev/null)"
-    if [[ -z "${scan_out}" ]]; then
-        _failed="${_failed}${forge} "
-        continue
-    fi
-    # Drop any existing entries for this host before appending fresh ones,
-    # so a rotated host key replaces the stale one rather than accumulating
-    # alongside it.
-    if grep -q "^${forge}[, ]" "${KNOWN_HOSTS_PATH}" 2>/dev/null; then
-        tmp="$(mktemp)"
-        grep -v "^${forge}[, ]" "${KNOWN_HOSTS_PATH}" > "${tmp}"
-        mv "${tmp}" "${KNOWN_HOSTS_PATH}"
-        chmod 600 "${KNOWN_HOSTS_PATH}"
-    fi
-    printf '%s\n' "${scan_out}" | grep -v '^#' >> "${KNOWN_HOSTS_PATH}"
-done
+# ── 5. Known hosts for Git forges — pinned, never keyscanned ──────────────
+# Security review H2. ssh-keyscan authenticates nothing: run on a hostile
+# network it pins the attacker's key. The forge keys ship with this module
+# (files/known_hosts.forges, verified against each vendor's published
+# fingerprints) and are installed to a module-owned file that
+# 00-defaults.conf lists as a second UserKnownHostsFile. The user's own
+# ~/.ssh/known_hosts is never written by this hook.
+mkdir -p "${KNOWN_HOSTS_D}"
+chmod 700 "${KNOWN_HOSTS_D}"
+cp "files/known_hosts.forges" "${FORGES_KNOWN_HOSTS}"
+chmod 644 "${FORGES_KNOWN_HOSTS}"
+echo "[INFO] workbench-ssh: pinned host keys installed for: ${FORGES}"
 
-if [[ -n "${_failed}" ]]; then
-    echo "[WARN] workbench-ssh: ssh-keyscan could not reach: ${_failed}— these hosts were NOT added to known_hosts. The first SSH connection to them may prompt for host-key verification, which will hang in non-interactive contexts."
-else
-    echo "[INFO] workbench-ssh: known_hosts pre-trusted for: ${FORGES}"
+# ── 6. Audit forge keys already in ~/.ssh/known_hosts ────────────────────
+# Earlier versions of this hook appended ssh-keyscan output here. Report —
+# never delete — any key for a forge that is not in the pinned set: it is
+# either a stale rotated key or was intercepted when it was scanned.
+if [[ -f "${KNOWN_HOSTS_PATH}" ]]; then
+    for forge in ${FORGES}; do
+        while IFS= read -r line; do
+            [[ -z "${line}" || "${line}" == \#* ]] && continue
+            key_type="$(printf '%s\n' "${line}" | awk '{print $2}')"
+            key_blob="$(printf '%s\n' "${line}" | awk '{print $3}')"
+            if ! grep -qF "${key_type} ${key_blob}" "files/known_hosts.forges"; then
+                fingerprint="$(printf '%s %s\n' "${key_type}" "${key_blob}" | ssh-keygen -lf - 2>/dev/null | awk '{print $2}')"
+                echo "[WARN] workbench-ssh: ${KNOWN_HOSTS_PATH} trusts a ${key_type} key for ${forge} (${fingerprint:-unknown fingerprint}) that is not in the pinned set. Check it against the vendor's published fingerprints; to rely on the pinned keys only, run: ssh-keygen -R ${forge}"
+            fi
+        done < <(ssh-keygen -F "${forge}" -f "${KNOWN_HOSTS_PATH}" 2>/dev/null)
+    done
 fi
 
 exit 0
