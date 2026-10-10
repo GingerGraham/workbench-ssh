@@ -6,6 +6,14 @@ All notable changes to `workbench-ssh` are documented here.
 
 ### Security
 
+- **Connection multiplexing is scoped to the Git forges** (security review
+  M8, L10). `ControlMaster`/`ControlPersist` moved out of `Host *` into a
+  `Host github.com gitlab.com bitbucket.org` block, so other hosts no longer
+  expose a ten-minute socket that bypasses FIDO2 touch, `ssh-add -c` and MFA.
+  Hosts can be opted back in from a later `config.d` file (see the README).
+  The `00-defaults.conf` header no longer wrongly claims per-host blocks
+  always win over `Host *`.
+
 - **Forge host keys are now pinned, not keyscanned** (security review H2).
   `hooks/post-deploy.sh` no longer runs `ssh-keyscan` or rewrites
   `~/.ssh/known_hosts`. The GitHub, GitLab and Bitbucket keys ship as
