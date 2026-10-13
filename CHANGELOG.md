@@ -4,6 +4,8 @@ All notable changes to `workbench-ssh` are documented here.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-10
+
 ### Fixed
 
 - **Module defaults no longer shadow your own SSH settings.** ssh uses the
