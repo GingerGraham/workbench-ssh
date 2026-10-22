@@ -4,6 +4,8 @@ All notable changes to `workbench-ssh` are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-22
+
 ### Changed
 
 - **No hook: `~/.ssh/config` gets two marked blocks written by
