@@ -37,21 +37,13 @@ else
     fail "no manifest found (checked ${_MANIFEST_CANDIDATES})"
 fi
 
-for key in version core_api register hooks; do
+for key in version core_api register deploy layers; do
     if [[ -n "${MANIFEST}" ]] && grep -q "^${key}:" "${MANIFEST}"; then
         ok "manifest declares '${key}:'"
     else
         fail "manifest missing '${key}:'"
     fi
 done
-
-# This module deliberately has NO deploy: entries — ~/.ssh/ is on the dest
-# denylist, so all SSH config placement goes through hooks/post-deploy.sh.
-if [[ -n "${MANIFEST}" ]] && grep -q "^deploy:" "${MANIFEST}"; then
-    fail "manifest unexpectedly declares deploy: — ~/.ssh/ is denylisted, this should be hooks-only"
-else
-    ok "manifest has no deploy: entries (expected — ~/.ssh/ is denylisted)"
-fi
 
 if [[ -n "${MANIFEST}" ]]; then
     while IFS= read -r src; do
@@ -64,13 +56,30 @@ if [[ -n "${MANIFEST}" ]]; then
     done < <(grep -E '^[[:space:]]*(-[[:space:]]*)?src:' "${MANIFEST}" | sed -E 's/^[[:space:]]*-?[[:space:]]*src:[[:space:]]*//')
 fi
 
-for f in files/00-defaults.conf files/01-agent.conf; do
-    [[ -f "${REPO_ROOT}/${f}" ]] && ok "hook-consumed file exists: ${f}" || fail "hook-consumed file missing: ${f}"
-done
+if [[ -n "${MANIFEST}" ]] && grep -q '^hooks:' "${MANIFEST}"; then
+    fail "manifest declares 'hooks:' — workbench-ssh needs no hook (workbench-core D82)"
+else
+    ok "manifest declares no hooks"
+fi
+if [[ -e "${REPO_ROOT}/hooks" ]]; then fail "hooks/ still exists"; else ok "no hooks/ directory"; fi
 
-[[ -x "${REPO_ROOT}/hooks/post-deploy.sh" ]] \
-    && ok "hooks/post-deploy.sh is executable" \
-    || fail "hooks/post-deploy.sh is not executable"
+if [[ -n "${MANIFEST}" ]] && grep -q '^core_api: ">=1.6 <2.0"$' "${MANIFEST}"; then
+    ok "core_api requires 1.6 (layers)"
+else
+    fail "core_api must be \">=1.6 <2.0\""
+fi
+
+# Every adopt: file must exist too — the src: scan above doesn't see them.
+if [[ -n "${MANIFEST}" ]]; then
+    while IFS= read -r adopt; do
+        [[ -z "${adopt}" ]] && continue
+        if [[ -f "${REPO_ROOT}/${adopt}" ]]; then
+            ok "adopt file exists: ${adopt}"
+        else
+            fail "manifest adopts a missing file: ${adopt}"
+        fi
+    done < <(sed -nE 's/^[[:space:]]*adopt:[[:space:]]*\[(.*)\][[:space:]]*$/\1/p' "${MANIFEST}" | tr ',' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+fi
 
 declare -a _bash32_patterns=(
     "declare -A (associative arrays, bash 4+)|declare[[:space:]]+-A"
@@ -85,7 +94,7 @@ for entry in "${_bash32_patterns[@]}"; do
     hit=""
     while IFS= read -r -d '' f; do
         grep -vE '^[[:space:]]*#' "${f}" | grep -qE "${pattern}" && hit="${hit}${f}\n"
-    done < <(find "${REPO_ROOT}/shell" "${REPO_ROOT}/hooks" -type f -print0 2>/dev/null)
+    done < <(find "${REPO_ROOT}/shell" -type f -print0 2>/dev/null)
     if [[ -n "${hit}" ]]; then
         fail "found ${desc} in: $(printf '%b' "${hit}" | tr '\n' ' ')"
     else

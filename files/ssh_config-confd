@@ -1,0 +1,4 @@
+# workbench-ssh (workbench-core docs/decisions-log.md D82): per-host files
+# in ~/.ssh/config.d/ — your 01-agent.conf and 2x-*.conf, and core's
+# 10-workbench.conf — load before everything else, so they win.
+Include ~/.ssh/config.d/*.conf

@@ -2,8 +2,8 @@
 #
 # Ecosystem module (workbench-core ARCHITECTURE.md §2/§3): opinionated SSH
 # client layer — hardened defaults, agent routing scaffold, pinned
-# forge host keys. Meaningless standalone — depends on
-# workbench-core's loader and Core API. The bootstrap-critical deploy-key/
+# forge host keys. Requires workbench-core only — works without any other
+# workbench module. The bootstrap-critical deploy-key/
 # alias mechanics (10-workbench.conf) stay in workbench-core itself
 # (lib/ssh/bootstrap.sh, ARCHITECTURE.md D1) — not part of this module.
 #
@@ -12,21 +12,26 @@
 version: 2
 branch: main
 
-core_api: ">=1.1 <2.0"
+core_api: ">=1.6 <2.0"
 sync:
   enabled: true
 
 info:
   description: "Hardened SSH client config, agent routing, and pinned forge host keys"
 
-# No deploy: entries — ~/.ssh/ is on the dest denylist (contracts/
-# manifest-spec.md's "dest validation" section), for good reason: SSH config
-# is security-sensitive and not something a manifest should be able to
-# target declaratively. files/00-defaults.conf and files/01-agent.conf ship
-# in this repo (read by hooks/post-deploy.sh from its own module snapshot,
-# $WORKBENCH_MODULE_DIR) but are placed into ~/.ssh/config.d/ by the hook
-# script below instead — the same escape valve workbench-core's own
-# lib/ssh/bootstrap.sh uses for the bootstrap-critical case (D1).
+deploy:
+  # Pinned forge host keys, referenced by files/00-defaults.conf's
+  # UserKnownHostsFile. The module's own files/ path is the one place under
+  # ~/.local/share/workbench/ a module may deploy to.
+  - src: files/known_hosts.forges
+    dest: ~/.local/share/workbench/modules/ssh/files/known_hosts.forges
+    mode: copy
+    lifecycle: generated
+  # Template for ssh-agent-scaffold (shell/ssh.sh) to copy from.
+  - src: files/01-agent.conf
+    dest: ~/.local/share/workbench/modules/ssh/files/01-agent.conf
+    mode: copy
+    lifecycle: generated
 
 register:
   shell:
@@ -37,10 +42,13 @@ register:
       function: get-ssh-functions
       label: "SSH agent and host-listing helpers"
 
-hooks:
-  post_deploy:
-    command: ["hooks/post-deploy.sh"]
-    run_on: changed   # fires on first sync and whenever this module updates —
-                       # not "always" (nothing to redo on every automatic
-                       # timer tick when the module hasn't changed).
-    timeout: 60
+layers:
+  # Hardened defaults, included at the end of ~/.ssh/config: ssh takes the
+  # first value it finds, so anything you've set wins.
+  - tool: ssh_config
+    src: files/00-defaults.conf
+    adopt: [files/legacy/ssh-defaults-include]
+  # Your ~/.ssh/config.d/*.conf files, included at the top so they win.
+  - tool: ssh_config
+    src: files/ssh_config-confd
+    position: over

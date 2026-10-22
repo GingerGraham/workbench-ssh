@@ -31,10 +31,10 @@ live in `workbench-core`'s own
 
 What's specific to this repo:
 
-- **`hooks.post_deploy` only runs if the machine explicitly opted in**
-  with `wb add ssh --allow-hooks` — an undeclared or ungated hook
-  is silently a no-op. If you find a way for this module's hook to run
-  without that flag, report it.
+- **This module ships no hook.** Its changes to `~/.ssh/config` are
+  marked blocks `workbench-core` writes (D82); a hook in any module only
+  runs if the machine opted in with `wb add <module> --allow-hooks`. If
+  you find a way for a module's hook to run without that flag, report it.
 - **This module's registered shell content is confined to its own
   snapshot namespace** — it cannot declare a `dest` and land content
   anywhere else. If you find a manifest shape that escapes that, report
