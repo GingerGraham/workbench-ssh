@@ -4,6 +4,36 @@ All notable changes to `workbench-ssh` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **No hook: `~/.ssh/config` gets two marked blocks written by
+  workbench-core** (workbench-core D82; needs Core API 1.6,
+  `core_api: ">=1.6 <2.0"`). One at the top includes your
+  `~/.ssh/config.d/*.conf`; one at the end, under `Match all`, includes
+  the hardened defaults straight from the module. Your settings outside
+  the blocks win, as before. `wb add ssh` no longer needs
+  `--allow-hooks`, and `wb files status ssh` shows both blocks. On
+  update, the defaults block the old hook appended is replaced by the
+  new one; the hook's top `Include` line is left in place.
+- **Pinned forge keys move to
+  `~/.local/share/workbench/modules/ssh/files/known_hosts.forges`**,
+  deployed by workbench-core; the defaults' `UserKnownHostsFile` points
+  there.
+- **Forge multiplexing sockets are `~/.ssh/cm-%C`**, not
+  `~/.ssh/cm_sockets/%C`: no directory to create first.
+- **`config.d/01-agent.conf` is created on request**, by the new
+  `ssh-agent-scaffold`, not on install. An existing one is never
+  touched.
+- **The known_hosts audit is a command**, `ssh-audit-known-hosts`,
+  instead of running on every update. Still read-only.
+
+### Removed
+
+- `hooks/post-deploy.sh`. Left on existing hosts and no longer used —
+  safe to delete, nothing deletes them automatically:
+  `~/.ssh/workbench-defaults.conf`, `~/.ssh/known_hosts.d/workbench-forges`,
+  `~/.ssh/cm_sockets/`. See the README's "Upgrading from 0.2.x".
+
 ## [0.2.2] - 2026-10-10
 
 ### Fixed

@@ -1,5 +1,5 @@
 # Pinned SSH host keys for Git forges -- workbench-ssh (security review H2).
-# Installed by hooks/post-deploy.sh to ~/.ssh/known_hosts.d/workbench-forges.
+# Deployed by workbench-core to ~/.local/share/workbench/modules/ssh/files/.
 # Never generated with ssh-keyscan. Sources (retrieved 2026-09-30):
 #   github.com    GitHub docs source (github/docs repo, data/reusables/ssh/
 #                 known_hosts.md and fingerprints.md), which render
