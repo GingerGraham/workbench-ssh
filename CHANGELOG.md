@@ -4,6 +4,20 @@ All notable changes to `workbench-ssh` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ssh-audit-known-hosts` flags unpinned forge keys in zsh.** The
+  forge loop didn't word-split there, so it checked nothing and reported
+  every forge key as pinned.
+- **`get-ssh-functions` lists the functions in zsh.** It is now the
+  getter workbench-core generates from the manifest (workbench-core
+  D89); the hand-written one printed `(none)` in zsh. The header now
+  reads `SSH agent and host-listing helpers — functions`.
+
+### Changed
+
+- Needs Core API 1.8 (`core_api: ">=1.8 <2.0"`).
+
 ## [0.3.0] - 2026-10-22
 
 ### Changed

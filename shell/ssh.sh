@@ -127,7 +127,6 @@ ssh-agent-scaffold() {
 ssh-audit-known-hosts() {
     local known_hosts="${HOME}/.ssh/known_hosts"
     local pinned="${HOME}/.local/share/workbench/modules/ssh/files/known_hosts.forges"
-    local forges="github.com gitlab.com bitbucket.org"
     local forge line key_type key_blob fingerprint found=0
     if [[ ! -f "${pinned}" ]]; then
         log_error "ssh: pinned host keys not found at ${pinned} — run: wb update ssh"
@@ -137,7 +136,10 @@ ssh-audit-known-hosts() {
         log_info "ssh: no ${known_hosts} — nothing to audit"
         return 0
     fi
-    for forge in ${forges}; do
+    # A literal list, not "${forges}": zsh doesn't word-split an unquoted
+    # variable, so the loop ran once over the whole string and reported a
+    # false all-clear.
+    for forge in github.com gitlab.com bitbucket.org; do
         while IFS= read -r line; do
             [[ -z "${line}" || "${line}" == \#* ]] && continue
             key_type="$(printf '%s\n' "${line}" | awk '{print $2}')"
@@ -154,9 +156,4 @@ ssh-audit-known-hosts() {
     else
         log_info "ssh: ${found} forge key(s) in ${known_hosts} not in the pinned set — see above"
     fi
-}
-
-get-ssh-functions() {
-    local _f="${BASH_SOURCE[0]}"
-    _get_functions_in "SSH functions" "" "${_f}"
 }

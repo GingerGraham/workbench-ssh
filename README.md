@@ -201,6 +201,6 @@ remove it with `ssh-keygen -R <host>` if it's stale.
 
 ## Requires
 
-- `workbench-core` with Core API 1.6 or later.
+- `workbench-core` with Core API 1.8 or later.
 - `ssh-keygen` (part of `openssh-client`, already a `workbench-core`
   required prerequisite) — used only by `ssh-audit-known-hosts`.
