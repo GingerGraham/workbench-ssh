@@ -97,8 +97,10 @@ Examples:
     fi
 
     # Append only keys not already there, so a re-run doesn't duplicate.
+    # set -e: any failed step on the remote (mkdir, an append, chmod) fails
+    # the whole command, rather than the closing echo reporting success.
     if printf '%s\n' "${keys_to_copy}" | ssh "${user_host}" \
-        'umask 077; mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && while IFS= read -r k; do [ -n "$k" ] || continue; grep -qxF -- "$k" ~/.ssh/authorized_keys || printf "%s\n" "$k" >> ~/.ssh/authorized_keys; done; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys; echo "Keys added"'; then
+        'set -e; umask 077; mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && while IFS= read -r k; do [ -n "$k" ] || continue; grep -qxF -- "$k" ~/.ssh/authorized_keys || printf "%s\n" "$k" >> ~/.ssh/authorized_keys; done; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys; echo "Keys added"'; then
         log_info "SSH keys copied successfully"
     else
         log_error "Failed to copy SSH keys to ${user_host}"; return 1

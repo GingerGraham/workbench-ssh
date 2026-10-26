@@ -100,6 +100,14 @@ ssh-copy-bw --all myhost >/dev/null 2>&1
     && ok "--all twice: three keys, each once" \
     || fail "--all twice: $(cat "${AK}")"
 
+# A failed append on the remote is a failure, not "copied successfully".
+rm -f "${AK}"; mkdir -p "${AK}"
+out="$(ssh-copy-bw myhost "My Key" 2>&1)"; rc=$?
+[[ "${rc}" -ne 0 ]] && ! grep -q "copied successfully" <<<"${out}" \
+    && ok "remote append fails: ssh-copy-bw returns non-zero" \
+    || fail "remote append failed but rc ${rc}: ${out}"
+rmdir "${AK}"
+
 # 9. In zsh, which sources shell/ssh.sh too.
 if ! command -v zsh >/dev/null 2>&1; then
     echo "SKIP: zsh not installed — zsh check skipped"
