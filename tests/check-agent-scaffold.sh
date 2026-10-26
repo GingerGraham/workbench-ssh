@@ -26,6 +26,7 @@ export HOME="${TMP_HOME}"
 log_info()  { echo "[INFO] $*"; }
 log_warn()  { echo "[WARN] $*"; }
 log_error() { echo "[ERROR] $*"; }
+_wb_declare_availability() { :; }
 # shellcheck source=shell/ssh.sh
 source "${REPO_ROOT}/shell/ssh.sh"
 

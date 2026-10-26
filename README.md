@@ -183,9 +183,12 @@ you're ready:
 ```sh
 list-ssh-hosts          # Host entries across ~/.ssh/config and every
                         # ~/.ssh/config.d/*.conf file
-ssh-copy-bw [--all] <user@host|user host> [key_pattern]
+ssh-copy-bw [--all] <destination> [key_pattern]
                         # copy key(s) from the SSH agent to a remote
-                        # host's authorized_keys
+                        # host's authorized_keys; <destination> is
+                        # user@host or a Host alias, key_pattern is
+                        # plain text; keys already there aren't added
+                        # again. Listed only when ssh-add is installed.
 ssh-agent-scaffold      # create ~/.ssh/config.d/01-agent.conf from the
                         # template, if you don't have one
 ssh-audit-known-hosts   # report forge keys in ~/.ssh/known_hosts that
