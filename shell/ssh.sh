@@ -2,8 +2,12 @@
 # shell/ssh.sh — workbench-ssh
 # SSH helpers — listing hosts, key management, the agent-routing scaffold
 # and a known_hosts audit. Registered at tier: tools (workbench.yml),
-# sourced unconditionally. list-ssh-hosts and ssh-copy-bw are ported from
-# workbench-precursor's core/ssh.sh, unchanged.
+# sourced unconditionally. list-ssh-hosts and ssh-copy-bw were ported from
+# workbench-precursor's core/ssh.sh.
+
+# Availability (workbench-core docs/module-authoring.md): ssh-copy-bw reads
+# the keys to copy from the SSH agent.
+_wb_declare_availability ssh-add ssh-copy-bw
 
 # ── List SSH hosts ─────────────────────────────────────────────────────────────
 list-ssh-hosts() {
@@ -16,23 +20,30 @@ list-ssh-hosts() {
         echo
     fi
 
+    # find, not a "${config_dir}"/* glob: an empty config.d is a "no matches"
+    # error in zsh. Same files the glob listed: no dotfiles, and a symlink
+    # to a file counts.
+    local config_file
     if [[ -d "${config_dir}" ]]; then
-        for config_file in "${config_dir}"/*; do
+        while IFS= read -r config_file; do
             [[ -f "${config_file}" ]] || continue
             echo "=== $(basename "${config_file}") ==="
             grep -E "^Host[[:space:]]" "${config_file}" | sed 's/Host //'
             echo
-        done
+        done < <(find "${config_dir}" -mindepth 1 -maxdepth 1 ! -name '.*' | sort)
     fi
 }
 
 # ── Copy SSH keys from agent to a remote host ─────────────────────────────────
 ssh-copy-bw() {
-    local usage="Usage: ssh-copy-bw [--all] <user@host|user host> [key_pattern]
+    local usage="Usage: ssh-copy-bw [--all] <destination> [key_pattern]
+
+<destination> is user@host or a Host alias from your ssh config.
+[key_pattern] is matched as plain text against each key in the agent.
 
 Examples:
   ssh-copy-bw user@server.example.com \"My Key\"
-  ssh-copy-bw user server.example.com \"2025-01-30\"
+  ssh-copy-bw myhost \"2025-01-30\"
   ssh-copy-bw --all user@server.example.com"
 
     local copy_all=false user_host="" key_pattern=""
@@ -44,8 +55,6 @@ Examples:
             *)
                 if [[ -z "${user_host}" ]]; then
                     user_host="$1"
-                elif [[ "${user_host}" != *"@"* && -z "${key_pattern}" ]]; then
-                    user_host="${user_host}@$1"
                 elif [[ -z "${key_pattern}" ]]; then
                     key_pattern="$1"
                 else
@@ -57,7 +66,7 @@ Examples:
     done
 
     if [[ -z "${user_host}" ]]; then
-        log_error "user@host is required"; echo "${usage}"; return 1
+        log_error "a destination (user@host or a Host alias) is required"; echo "${usage}"; return 1
     fi
 
     if [[ "${copy_all}" == false && -z "${key_pattern}" ]]; then
@@ -79,7 +88,7 @@ Examples:
         keys_to_copy="${available_keys}"
         log_info "Copying all $(echo "${available_keys}" | wc -l) key(s) to ${user_host}..."
     else
-        keys_to_copy="$(echo "${available_keys}" | grep "${key_pattern}")"
+        keys_to_copy="$(printf '%s\n' "${available_keys}" | grep -F -- "${key_pattern}")"
         if [[ -z "${keys_to_copy}" ]]; then
             log_error "No keys matching '${key_pattern}'"
             log_info "Available keys:"; echo "${available_keys}"; return 1
@@ -87,8 +96,11 @@ Examples:
         log_info "Copying $(echo "${keys_to_copy}" | wc -l) key(s) to ${user_host}..."
     fi
 
-    if echo "${keys_to_copy}" | ssh "${user_host}" \
-        "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && echo 'Keys added'"; then
+    # Append only keys not already there, so a re-run doesn't duplicate.
+    # set -e: any failed step on the remote (mkdir, an append, chmod) fails
+    # the whole command, rather than the closing echo reporting success.
+    if printf '%s\n' "${keys_to_copy}" | ssh "${user_host}" \
+        'set -e; umask 077; mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && while IFS= read -r k; do [ -n "$k" ] || continue; grep -qxF -- "$k" ~/.ssh/authorized_keys || printf "%s\n" "$k" >> ~/.ssh/authorized_keys; done; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys; echo "Keys added"'; then
         log_info "SSH keys copied successfully"
     else
         log_error "Failed to copy SSH keys to ${user_host}"; return 1
@@ -127,7 +139,6 @@ ssh-agent-scaffold() {
 ssh-audit-known-hosts() {
     local known_hosts="${HOME}/.ssh/known_hosts"
     local pinned="${HOME}/.local/share/workbench/modules/ssh/files/known_hosts.forges"
-    local forges="github.com gitlab.com bitbucket.org"
     local forge line key_type key_blob fingerprint found=0
     if [[ ! -f "${pinned}" ]]; then
         log_error "ssh: pinned host keys not found at ${pinned} — run: wb update ssh"
@@ -137,7 +148,10 @@ ssh-audit-known-hosts() {
         log_info "ssh: no ${known_hosts} — nothing to audit"
         return 0
     fi
-    for forge in ${forges}; do
+    # A literal list, not "${forges}": zsh doesn't word-split an unquoted
+    # variable, so the loop ran once over the whole string and reported a
+    # false all-clear.
+    for forge in github.com gitlab.com bitbucket.org; do
         while IFS= read -r line; do
             [[ -z "${line}" || "${line}" == \#* ]] && continue
             key_type="$(printf '%s\n' "${line}" | awk '{print $2}')"
@@ -154,9 +168,4 @@ ssh-audit-known-hosts() {
     else
         log_info "ssh: ${found} forge key(s) in ${known_hosts} not in the pinned set — see above"
     fi
-}
-
-get-ssh-functions() {
-    local _f="${BASH_SOURCE[0]}"
-    _get_functions_in "SSH functions" "" "${_f}"
 }

@@ -4,6 +4,39 @@ All notable changes to `workbench-ssh` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ssh-audit-known-hosts` flags unpinned forge keys in zsh.** The
+  forge loop didn't word-split there, so it checked nothing and reported
+  every forge key as pinned.
+- **`get-ssh-functions` lists the functions in zsh.** It is now the
+  getter workbench-core generates from the manifest (workbench-core
+  D89); the hand-written one printed `(none)` in zsh. The header now
+  reads `SSH agent and host-listing helpers — functions`.
+- **`ssh-copy-bw` no longer duplicates keys on the remote.** Only keys
+  not already in `~/.ssh/authorized_keys` are appended.
+- **`ssh-copy-bw`'s key pattern is plain text.** It was a regex, and a
+  pattern starting with `-` was taken as a `grep` option.
+- **The hardened defaults apply on OpenSSH before 8.5** (e.g. RHEL 8).
+  `PubkeyAcceptedAlgorithms` is new in 8.5; older versions rejected the
+  whole defaults layer. It is now listed in `IgnoreUnknown` first. If
+  your own `~/.ssh/config` sets `IgnoreUnknown` above the defaults block,
+  add `PubkeyAcceptedAlgorithms` to it: ssh uses the first
+  `IgnoreUnknown` it reads.
+- **`list-ssh-hosts` works in zsh with an empty `~/.ssh/config.d`.** It
+  stopped with a "no matches found" error.
+
+### Changed
+
+- **`ssh-copy-bw <user> <host>` is gone.** The first argument is the
+  destination — `user@host` or a `Host` alias from your ssh config — and
+  the second is the key pattern, so `ssh-copy-bw myhost "My Key"` now
+  copies to `myhost` rather than `myhost@My Key`. Write
+  `ssh-copy-bw user@host …` where you used `ssh-copy-bw user host …`.
+- `ssh-copy-bw` is listed by `wb functions` and `get-ssh-functions` only
+  when `ssh-add` is installed.
+- Needs Core API 1.8 (`core_api: ">=1.8 <2.0"`).
+
 ## [0.3.0] - 2026-10-22
 
 ### Changed

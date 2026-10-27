@@ -63,10 +63,18 @@ else
 fi
 if [[ -e "${REPO_ROOT}/hooks" ]]; then fail "hooks/ still exists"; else ok "no hooks/ directory"; fi
 
-if [[ -n "${MANIFEST}" ]] && grep -q '^core_api: ">=1.6 <2.0"$' "${MANIFEST}"; then
-    ok "core_api requires 1.6 (layers)"
+if [[ -n "${MANIFEST}" ]] && grep -q '^core_api: ">=1.8 <2.0"$' "${MANIFEST}"; then
+    ok "core_api requires 1.8 (layers, core-generated getter)"
 else
-    fail "core_api must be \">=1.6 <2.0\""
+    fail "core_api must be \">=1.8 <2.0\""
+fi
+
+# Core defines get-ssh-functions from register.getters[] (workbench-core
+# D89). A hand-written one would win over it, and would break in zsh.
+if grep -rqE '^[[:space:]]*(function[[:space:]]+)?get-[a-z-]+-functions' "${REPO_ROOT}/shell/"; then
+    fail "shell/ defines a get-*-functions getter — core generates it from register.getters[]"
+else
+    ok "shell/ defines no get-*-functions getter (core generates it)"
 fi
 
 # Every adopt: file must exist too — the src: scan above doesn't see them.

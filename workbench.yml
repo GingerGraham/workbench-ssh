@@ -12,7 +12,7 @@
 version: 2
 branch: main
 
-core_api: ">=1.6 <2.0"
+core_api: ">=1.8 <2.0"
 sync:
   enabled: true
 

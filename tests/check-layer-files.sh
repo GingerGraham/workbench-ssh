@@ -29,6 +29,15 @@ if grep -Eq '(cm_sockets|known_hosts\.d)' "${REPO_ROOT}/files/00-defaults.conf";
 else
     ok "files/00-defaults.conf names no pre-D82 path"
 fi
+# OpenSSH before 8.5 rejects PubkeyAcceptedAlgorithms, and with it the whole
+# defaults layer, unless IgnoreUnknown names it first.
+ignore_line="$(grep -nE '^[[:space:]]*IgnoreUnknown[[:space:]]+PubkeyAcceptedAlgorithms[[:space:]]*$' "${REPO_ROOT}/files/00-defaults.conf" | head -n 1 | cut -d: -f1)"
+keyword_line="$(grep -nE '^[[:space:]]*PubkeyAcceptedAlgorithms[[:space:]]' "${REPO_ROOT}/files/00-defaults.conf" | head -n 1 | cut -d: -f1)"
+if [[ -n "${ignore_line}" && -n "${keyword_line}" && "${ignore_line}" -lt "${keyword_line}" ]]; then
+    ok "IgnoreUnknown PubkeyAcceptedAlgorithms precedes the keyword (OpenSSH < 8.5)"
+else
+    fail "IgnoreUnknown PubkeyAcceptedAlgorithms must come before PubkeyAcceptedAlgorithms (lines: '${ignore_line}', '${keyword_line}')"
+fi
 
 if ! command -v ssh &>/dev/null; then
     echo "SKIP: ssh not installed — 'ssh -G' checks skipped"

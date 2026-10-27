@@ -30,6 +30,7 @@ export HOME="${TMP_HOME}"
 log_info()  { echo "[INFO] $*"; }
 log_warn()  { echo "[WARN] $*"; }
 log_error() { echo "[ERROR] $*"; }
+_wb_declare_availability() { :; }
 # shellcheck source=shell/ssh.sh
 source "${REPO_ROOT}/shell/ssh.sh"
 
@@ -89,6 +90,34 @@ out="$(ssh-audit-known-hosts 2>&1)"; rc=$?
 cmp -s "${HOME}/.ssh/known_hosts" "${HOME}/known_hosts.before" \
     && ok "the user's known_hosts is byte-identical to before" \
     || fail "the user's known_hosts was modified"
+
+# 9–10. The same fixtures in zsh, which sources shell/ssh.sh too. An
+# unquoted "${forges}" loop didn't word-split there, so the audit ran once
+# over the whole string and reported a false all-clear.
+# zsh_audit: runs ssh-audit-known-hosts in a fresh zsh against this HOME.
+zsh_audit() {
+    zsh -fc '
+        log_info()  { echo "[INFO] $*"; }
+        log_warn()  { echo "[WARN] $*"; }
+        log_error() { echo "[ERROR] $*"; }
+        _wb_declare_availability() { :; }
+        source "$1" && ssh-audit-known-hosts
+    ' zsh "${REPO_ROOT}/shell/ssh.sh" 2>&1
+}
+if ! command -v zsh >/dev/null 2>&1; then
+    echo "SKIP: zsh not installed — zsh checks skipped"
+else
+    out="$(zsh_audit)"
+    [[ "$(printf '%s\n' "${out}" | grep -c '^\[WARN\].*github.com.*not in the pinned set')" -eq 1 \
+        && "${out}" == *"1 forge key(s)"* ]] \
+        && ok "zsh: the unpinned github.com key is flagged" \
+        || fail "zsh: unpinned key: ${out}"
+    printf '%s\n' "${pinned_line}" > "${HOME}/.ssh/known_hosts"
+    out="$(zsh_audit)"
+    [[ "${out}" != *"[WARN]"* && "${out}" == *"every forge key"* ]] \
+        && ok "zsh: pinned key only: no warning, clean summary" \
+        || fail "zsh: pinned key only: ${out}"
+fi
 
 echo
 echo "==============================="
