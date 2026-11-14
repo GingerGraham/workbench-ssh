@@ -12,6 +12,13 @@ All notable changes to `workbench-ssh` are documented here.
   an optional distribution and version field, and an "Environment"
   dropdown (directly on the OS, container, or WSL2), so a report says
   which distro it ran on and whether that was WSL2 or a container.
+- **Agent and contributor guidance covers the stale-base CHANGELOG trap
+  (workbench-core D115).** `AGENTS.md`, `.github/copilot-instructions.md`,
+  `CONTRIBUTING.md`, the PR template and the conventional-commits skill
+  checklist now say to check, before opening a PR and before any later
+  push, that a release which landed on `main` since you branched hasn't
+  left your `[Unreleased]` entry inside the released section, and to look
+  at the Release run after merging.
 
 ## [1.0.0] - 2026-10-27
 
