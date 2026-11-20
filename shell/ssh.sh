@@ -5,7 +5,7 @@
 # sourced unconditionally. list-ssh-hosts and ssh-copy-bw were ported from
 # workbench-precursor's core/ssh.sh.
 
-# Availability (workbench-core docs/module-authoring.md): ssh-copy-bw reads
+# Availability (workbench-core docs/guide/module-authoring.md): ssh-copy-bw reads
 # the keys to copy from the SSH agent.
 _wb_declare_availability ssh-add ssh-copy-bw
 
